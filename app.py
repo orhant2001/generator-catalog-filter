@@ -2,6 +2,7 @@
  
 from __future__ import annotations
  
+import re
 from hashlib import sha256
 from typing import Any
  
@@ -143,6 +144,55 @@ def format_option(value: float) -> str:
     """Display catalogue numeric options without unnecessary trailing zeros."""
     numeric = float(value)
     return f"{numeric:,.0f}" if numeric.is_integer() else f"{numeric:,.2f}".rstrip("0").rstrip(".")
+ 
+ 
+_IMO_TIER_RE = re.compile(r"\b(III|II|I)\b")
+_IMO_TIER_ORDER = ("I", "II", "III")
+ 
+ 
+def imo_tiers_in(value: Any) -> list[str]:
+    """Return the IMO NOx tiers (I, II, III) mentioned in a raw catalogue value.
+ 
+    Longest-first alternation with word boundaries means "IMO Tier III" yields
+    ["III"] (not ["II", "I"]) and "IMO Tier II / IMO Tier III" yields ["II", "III"].
+    """
+    return _IMO_TIER_RE.findall(str(value).upper())
+ 
+ 
+def build_imo_options(data: pd.DataFrame) -> tuple[list[str], dict[str, set[str]]]:
+    """Build tier-based IMO filter options mapped to the raw values they include.
+ 
+    Selecting "IMO Tier II" also includes combined values such as
+    "IMO Tier II / IMO Tier III" — without altering the stored or displayed data,
+    because each option expands to the exact raw strings it should match.
+    Values with no recognizable tier are kept as their own literal option.
+    """
+    raw_values = text_options(data, "imo")
+    tier_to_raw: dict[str, set[str]] = {}
+    literal_values: list[str] = []
+    for raw in raw_values:
+        tiers = set(imo_tiers_in(raw))
+        if tiers:
+            for tier in tiers:
+                tier_to_raw.setdefault(tier, set()).add(raw)
+        else:
+            literal_values.append(raw)
+ 
+    options: list[str] = []
+    option_to_raw: dict[str, set[str]] = {}
+ 
+    ordered_tiers = [tier for tier in _IMO_TIER_ORDER if tier in tier_to_raw]
+    ordered_tiers += [tier for tier in sorted(tier_to_raw) if tier not in _IMO_TIER_ORDER]
+    for tier in ordered_tiers:
+        label = f"IMO Tier {tier}"
+        options.append(label)
+        option_to_raw[label] = tier_to_raw[tier]
+ 
+    for raw in literal_values:
+        options.append(raw)
+        option_to_raw[raw] = {raw}
+ 
+    return options, option_to_raw
  
  
 def display_table(data: pd.DataFrame) -> pd.DataFrame:
@@ -375,7 +425,7 @@ def main() -> None:
     brands = text_options(data, "brand")
     voltages = numeric_options(data, "line_voltage_v")
     frequencies = numeric_options(data, "frequency_hz")
-    imo_values = text_options(data, "imo")
+    imo_options, imo_option_to_raw = build_imo_options(data)
  
     st.subheader("2. Product filters")
     st.markdown(
@@ -484,14 +534,29 @@ def main() -> None:
     with imo_col:
         selected_imo = st.multiselect(
             "IMO / emission tier",
-            options=imo_values,
+            options=imo_options,
             default=[],
             key="selected_imo",
             placeholder="All IMO / emission values",
-            help="Leave empty to include all published and blank IMO values.",
+            help=(
+                "Select a NOx tier to include every catalogue value that lists it — "
+                "e.g. IMO Tier II also matches rows labelled 'IMO Tier II / IMO Tier III'. "
+                "Leave empty to include all published and blank IMO values."
+            ),
         )
  
     st.markdown("</div>", unsafe_allow_html=True)
+ 
+    # Expand tier selections (e.g. "IMO Tier II") into the exact raw catalogue
+    # strings they cover (e.g. "IMO II", "IMO Tier II / IMO Tier III"), so matching
+    # stays exact and the stored/displayed data is never modified.
+    expanded_imo_values = sorted(
+        {
+            raw
+            for option in selected_imo
+            for raw in imo_option_to_raw.get(option, {option})
+        }
+    )
  
     filters = {
         "brands": selected_brands,
@@ -506,7 +571,7 @@ def main() -> None:
         "maximum_dry_weight_kg": maximum_dry_weight,
         "maximum_wet_weight_kg": maximum_wet_weight,
         "maximum_fuel_consumption_g_bkwh": maximum_fuel,
-        "imo_values": selected_imo,
+        "imo_values": expanded_imo_values,
     }
  
     st.markdown("---")
