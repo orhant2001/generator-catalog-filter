@@ -71,6 +71,52 @@ st.markdown(
             margin: 0.5rem 0 1rem 0;
         }
         .small-muted { color: #6B7280; font-size: 0.9rem; }
+ 
+        /* Section label styling for ##### headers used inside the filter form */
+        h4 { color: #0B2545; }
+        h5 {
+            color: #1D4ED8;
+            font-size: 0.82rem !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            border-bottom: 1px solid #E5E7EB;
+            padding-bottom: 0.35rem;
+            margin: 1.4rem 0 0.6rem 0;
+        }
+ 
+        /* Filter card: wraps the whole filter form in a soft panel */
+        .filter-card {
+            background: #FBFCFE;
+            border: 1px solid #E5E7EB;
+            border-radius: 14px;
+            padding: 0.4rem 1.25rem 1rem 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+ 
+        /* Rounded, bordered expanders */
+        div[data-testid="stExpander"] {
+            border: 1px solid #E5E7EB;
+            border-radius: 12px;
+            background: #FFFFFF;
+            overflow: hidden;
+        }
+        div[data-testid="stExpander"] summary { font-weight: 600; color: #0B2545; }
+ 
+        /* Blue chips for multiselect selections */
+        span[data-baseweb="tag"] {
+            background-color: #1D4ED8 !important;
+            border-radius: 6px !important;
+        }
+ 
+        /* Blue slider track/handle */
+        div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {
+            background-color: #1D4ED8 !important;
+            border-color: #1D4ED8 !important;
+        }
+ 
+        /* Tidy number inputs */
+        div[data-testid="stNumberInput"] input { border-radius: 8px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -168,28 +214,18 @@ def render_grouped_results(data: pd.DataFrame) -> None:
  
  
 FILTER_WIDGET_KEYS = (
-    "all_brands",
     "selected_brands",
     "model_query",
     "selected_voltages",
     "selected_frequencies",
+    "power_range",
     "selected_imo",
-    "minimum_power_enabled",
-    "minimum_power_value",
-    "maximum_power_enabled",
-    "maximum_power_value",
-    "maximum_width_enabled",
-    "maximum_width_value",
-    "maximum_depth_enabled",
-    "maximum_depth_value",
-    "maximum_height_enabled",
-    "maximum_height_value",
-    "maximum_dry_weight_enabled",
-    "maximum_dry_weight_value",
-    "maximum_wet_weight_enabled",
-    "maximum_wet_weight_value",
-    "maximum_fuel_enabled",
-    "maximum_fuel_value",
+    "max_width_mm",
+    "max_depth_mm",
+    "max_height_mm",
+    "max_dry_weight_kg",
+    "max_wet_weight_kg",
+    "max_fuel_consumption_g_bkwh",
 )
  
  
@@ -212,26 +248,33 @@ def numeric_column_max(data: pd.DataFrame, column: str, fallback: float = 0.0) -
     return max(float(values.max()), 0.0)
  
  
-def optional_limit(
-    checkbox_label: str,
-    input_label: str,
-    key_prefix: str,
-    default_value: float,
+def max_number_filter(
+    label: str,
+    column: str,
+    data: pd.DataFrame,
     step: float,
     help_text: str | None = None,
 ) -> float | None:
-    """Render an optional maximum/minimum numeric catalogue filter."""
-    enabled = st.checkbox(checkbox_label, key=f"{key_prefix}_enabled")
+    """Render an optional maximum filter as a single blank-able number input.
+ 
+    Leaving the field empty means the filter is not applied — no checkbox needed.
+    """
+    col_max = numeric_column_max(data, column)
+    hint = "Leave blank for no limit."
+    if col_max:
+        hint += f" Catalogue maximum: {col_max:,.0f}."
+    if help_text:
+        hint = f"{help_text} {hint}"
     value = st.number_input(
-        input_label,
+        label,
         min_value=0.0,
-        value=float(default_value),
+        value=None,
         step=float(step),
-        disabled=not enabled,
-        key=f"{key_prefix}_value",
-        help=help_text,
+        key=f"max_{column}",
+        help=hint,
+        placeholder="No limit",
     )
-    return float(value) if enabled else None
+    return float(value) if value is not None else None
  
  
 def render_database_summary(stats: dict[str, Any]) -> None:
@@ -335,128 +378,123 @@ def main() -> None:
     imo_values = text_options(data, "imo")
  
     st.subheader("2. Product filters")
-    top_left, top_right = st.columns(2)
-    with top_left:
-        all_brands = st.checkbox("All brands", value=True, key="all_brands")
+    st.markdown(
+        '<div class="small-muted">Every filter is optional. Leave a field empty to ignore it — '
+        "an empty brand, voltage, or frequency selection includes all values.</div>",
+        unsafe_allow_html=True,
+    )
+ 
+    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
+ 
+    st.markdown("##### Identification")
+    id_left, id_right = st.columns(2)
+    with id_left:
         selected_brands = st.multiselect(
-            "Preferred brands",
+            "Brands",
             options=brands,
             default=[],
             key="selected_brands",
-            disabled=all_brands,
-            help="Select one or more manufacturers, or leave All brands enabled.",
+            placeholder="All brands — leave empty for every manufacturer",
+            help="Pick one or more manufacturers, or leave empty to include all brands.",
         )
+    with id_right:
         model_query = st.text_input(
             "Model search",
-            placeholder="Example: M26 or K19",
+            placeholder="e.g. M26, K19, PP16V4000",
             key="model_query",
             help="Case-insensitive partial model-name search.",
         )
  
-    with top_right:
+    st.markdown("##### Electrical")
+    elec_left, elec_right = st.columns(2)
+    with elec_left:
         selected_voltages = st.multiselect(
             "Line-line voltage [V]",
             options=voltages,
             default=[],
             key="selected_voltages",
             format_func=format_option,
+            placeholder="All voltages",
             help="Leave empty to include all published voltage values.",
         )
+    with elec_right:
         selected_frequencies = st.multiselect(
             "Frequency [Hz]",
             options=frequencies,
             default=[],
             key="selected_frequencies",
             format_func=format_option,
+            placeholder="All frequencies",
             help="Leave empty to include all published frequency values.",
         )
  
-    power_left, power_right = st.columns(2)
-    with power_left:
-        minimum_power = optional_limit(
-            "Use minimum power filter",
-            "Minimum generator power [kW]",
-            "minimum_power",
-            default_value=float(data["power_kw"].min()),
-            step=10.0,
+    st.markdown("##### Power")
+    power_min = float(data["power_kw"].min())
+    power_max = float(data["power_kw"].max())
+    if power_min >= power_max:
+        st.info(f"Every rating row shares the same power: {power_min:,.1f} kW.")
+        minimum_power = None
+        maximum_power = None
+    else:
+        power_low, power_high = st.slider(
+            "Power range [kW]",
+            min_value=power_min,
+            max_value=power_max,
+            value=(power_min, power_max),
+            step=max(round((power_max - power_min) / 100, 1), 0.1),
+            key="power_range",
+            help="Drag the handles to set a minimum and/or maximum. Full range means no power filter.",
         )
-    with power_right:
-        maximum_power = optional_limit(
-            "Use maximum power filter",
-            "Maximum generator power [kW]",
-            "maximum_power",
-            default_value=float(data["power_kw"].max()),
-            step=10.0,
+        minimum_power = power_low if power_low > power_min else None
+        maximum_power = power_high if power_high < power_max else None
+ 
+    st.markdown("##### Size, weight, fuel & emissions")
+    st.caption(
+        "Enter a maximum value to apply a limit, or leave a field blank to ignore it. "
+        "If an applied limit uses a field that is blank for a product, that product is listed "
+        "separately as unverified rather than as a confirmed match."
+    )
+ 
+    st.markdown("**Maximum dimensions [mm]**")
+    dim1, dim2, dim3 = st.columns(3)
+    with dim1:
+        maximum_width = max_number_filter("Max width [mm]", "width_mm", data, step=50.0)
+    with dim2:
+        maximum_depth = max_number_filter("Max depth [mm]", "depth_mm", data, step=50.0)
+    with dim3:
+        maximum_height = max_number_filter("Max height [mm]", "height_mm", data, step=50.0)
+ 
+    st.markdown("**Maximum weight [kg]**")
+    weight1, weight2 = st.columns(2)
+    with weight1:
+        maximum_dry_weight = max_number_filter("Max dry weight [kg]", "dry_weight_kg", data, step=50.0)
+    with weight2:
+        maximum_wet_weight = max_number_filter("Max wet weight [kg]", "wet_weight_kg", data, step=50.0)
+ 
+    st.markdown("**Fuel & emissions**")
+    fuel_col, imo_col = st.columns(2)
+    with fuel_col:
+        maximum_fuel = max_number_filter(
+            "Max fuel consumption [g/bkW-h]",
+            "fuel_consumption_g_bkwh",
+            data,
+            step=1.0,
+            help_text="Uses the published catalogue value only; not an efficiency recommendation.",
         )
- 
-    with st.expander("Advanced catalogue filters", expanded=False):
-        st.caption(
-            "When an enabled filter uses a field that is blank for a product, that product is not "
-            "treated as a confirmed match. It is shown separately as unverified."
-        )
-        dim1, dim2, dim3 = st.columns(3)
-        with dim1:
-            maximum_width = optional_limit(
-                "Limit maximum width",
-                "Maximum width [mm]",
-                "maximum_width",
-                default_value=numeric_column_max(data, "width_mm"),
-                step=100.0,
-            )
-        with dim2:
-            maximum_depth = optional_limit(
-                "Limit maximum depth",
-                "Maximum depth [mm]",
-                "maximum_depth",
-                default_value=numeric_column_max(data, "depth_mm"),
-                step=100.0,
-            )
-        with dim3:
-            maximum_height = optional_limit(
-                "Limit maximum height",
-                "Maximum height [mm]",
-                "maximum_height",
-                default_value=numeric_column_max(data, "height_mm"),
-                step=100.0,
-            )
- 
-        weight1, weight2, fuel_col = st.columns(3)
-        with weight1:
-            maximum_dry_weight = optional_limit(
-                "Limit maximum dry weight",
-                "Maximum dry weight [kg]",
-                "maximum_dry_weight",
-                default_value=numeric_column_max(data, "dry_weight_kg"),
-                step=100.0,
-            )
-        with weight2:
-            maximum_wet_weight = optional_limit(
-                "Limit maximum wet weight",
-                "Maximum wet weight [kg]",
-                "maximum_wet_weight",
-                default_value=numeric_column_max(data, "wet_weight_kg"),
-                step=100.0,
-            )
-        with fuel_col:
-            maximum_fuel = optional_limit(
-                "Limit published fuel consumption",
-                "Maximum fuel consumption [g/bkW-h]",
-                "maximum_fuel",
-                default_value=numeric_column_max(data, "fuel_consumption_g_bkwh"),
-                step=1.0,
-                help_text="Uses the published catalogue value only; it is not an efficiency recommendation.",
-            )
- 
+    with imo_col:
         selected_imo = st.multiselect(
-            "IMO / emission information",
+            "IMO / emission tier",
             options=imo_values,
             default=[],
             key="selected_imo",
+            placeholder="All IMO / emission values",
             help="Leave empty to include all published and blank IMO values.",
         )
  
+    st.markdown("</div>", unsafe_allow_html=True)
+ 
     filters = {
-        "brands": [] if all_brands else selected_brands,
+        "brands": selected_brands,
         "model_query": model_query.strip(),
         "minimum_power_kw": minimum_power,
         "maximum_power_kw": maximum_power,
@@ -473,20 +511,17 @@ def main() -> None:
  
     st.markdown("---")
     if st.button("Find generator products", type="primary", use_container_width=True):
-        if not all_brands and not selected_brands:
-            st.error("Select at least one brand or enable All brands.")
+        try:
+            exact, unverified, missing_columns = filter_catalog(data, filters)
+        except ValueError as exc:
+            st.error(str(exc))
+        except Exception:
+            st.error("The selected filters could not be applied due to an unexpected error.")
         else:
-            try:
-                exact, unverified, missing_columns = filter_catalog(data, filters)
-            except ValueError as exc:
-                st.error(str(exc))
-            except Exception:
-                st.error("The selected filters could not be applied due to an unexpected error.")
-            else:
-                st.session_state["filter_result"] = exact
-                st.session_state["filter_unverified"] = unverified
-                st.session_state["filter_values"] = filters
-                st.session_state["missing_filter_columns"] = missing_columns
+            st.session_state["filter_result"] = exact
+            st.session_state["filter_unverified"] = unverified
+            st.session_state["filter_values"] = filters
+            st.session_state["missing_filter_columns"] = missing_columns
  
     if "filter_result" not in st.session_state:
         st.caption("Results will appear only after you click Find generator products.")
