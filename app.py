@@ -1,13 +1,13 @@
 """Single-page Streamlit interface for filtering a marine generator catalogue."""
-
+ 
 from __future__ import annotations
-
+ 
 from hashlib import sha256
 from typing import Any
-
+ 
 import pandas as pd
 import streamlit as st
-
+ 
 from data_utils import (
     DISPLAY_NAMES,
     DataError,
@@ -18,23 +18,23 @@ from data_utils import (
     prepare_table,
     text_options,
 )
-
-
+ 
+ 
 APP_TITLE = "Marine Generator Catalog Filter"
 APP_DESCRIPTION = (
     "A simple catalogue filtering tool for listing marine generator product "
     "ratings from an Excel database according to user-selected technical criteria."
 )
-
-
+ 
+ 
 st.set_page_config(
     page_title=APP_TITLE,
     page_icon="⚙️",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
-
+ 
+ 
 st.markdown(
     """
     <style>
@@ -75,14 +75,14 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-
+ 
+ 
 @st.cache_data(show_spinner=False)
 def cached_load_database(file_bytes: bytes) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Cache workbook parsing while the uploaded file remains unchanged."""
     return load_database(file_bytes)
-
-
+ 
+ 
 @st.cache_data(show_spinner=False)
 def cached_export(
     exact: pd.DataFrame,
@@ -91,14 +91,14 @@ def cached_export(
 ) -> bytes:
     """Cache the in-memory Excel export for the current result set."""
     return export_excel(exact, filters, unverified)
-
-
+ 
+ 
 def format_option(value: float) -> str:
     """Display catalogue numeric options without unnecessary trailing zeros."""
     numeric = float(value)
     return f"{numeric:,.0f}" if numeric.is_integer() else f"{numeric:,.2f}".rstrip("0").rstrip(".")
-
-
+ 
+ 
 def display_table(data: pd.DataFrame) -> pd.DataFrame:
     """Prepare a readable table without altering the data used for export."""
     table = prepare_table(data).copy()
@@ -124,8 +124,49 @@ def display_table(data: pd.DataFrame) -> pd.DataFrame:
         if column not in decimal_places:
             table[column] = table[column].astype(object).where(table[column].notna(), "Not available")
     return table
-
-
+ 
+ 
+def render_grouped_results(data: pd.DataFrame) -> None:
+    """Show one collapsible box per model; each box lists that model's rating rows.
+ 
+    Rows that share a model but differ only by voltage/frequency (e.g. PP16V4000P63
+    listed several times) are collapsed under a single expandable entry. When the box
+    is opened, each voltage/frequency variation is shown on its own line.
+    """
+    grouped = data.groupby(["brand", "model"], sort=False)
+    st.caption(
+        f"{grouped.ngroups:,} model · {len(data):,} rating row(s) — the same model can "
+        "repeat for different voltage / frequency options."
+    )
+ 
+    for (brand, model), group in grouped:
+        count = len(group)
+        powers = pd.to_numeric(group["power_kw"], errors="coerce").dropna()
+        if powers.empty:
+            power_text = ""
+        elif powers.min() == powers.max():
+            power_text = f" · {powers.min():,.1f} kW"
+        else:
+            power_text = f" · {powers.min():,.1f}–{powers.max():,.1f} kW"
+ 
+        label = "rating" if count == 1 else "ratings"
+        header = f"{brand} — {model}   ·   {count} {label}{power_text}"
+ 
+        with st.expander(header, expanded=False):
+            scenarios = display_table(group)
+            # The model/brand is already in the header, so drop those columns inside.
+            for redundant in ("Brand", "Model", "brand", "model"):
+                if redundant in scenarios.columns:
+                    scenarios = scenarios.drop(columns=redundant)
+            scenarios.insert(0, "#", list(range(1, len(scenarios) + 1)))
+            st.dataframe(
+                scenarios,
+                use_container_width=True,
+                hide_index=True,
+                height=min(430, 60 + 35 * min(count, 10)),
+            )
+ 
+ 
 FILTER_WIDGET_KEYS = (
     "all_brands",
     "selected_brands",
@@ -150,8 +191,8 @@ FILTER_WIDGET_KEYS = (
     "maximum_fuel_enabled",
     "maximum_fuel_value",
 )
-
-
+ 
+ 
 def reset_results(clear_filter_widgets: bool = False) -> None:
     """Remove saved results and optionally reset filters for a new workbook."""
     for key in ("filter_result", "filter_unverified", "filter_values", "missing_filter_columns"):
@@ -159,8 +200,8 @@ def reset_results(clear_filter_widgets: bool = False) -> None:
     if clear_filter_widgets:
         for key in FILTER_WIDGET_KEYS:
             st.session_state.pop(key, None)
-
-
+ 
+ 
 def numeric_column_max(data: pd.DataFrame, column: str, fallback: float = 0.0) -> float:
     """Return a safe non-negative default maximum for an optional column."""
     if column not in data.columns:
@@ -169,8 +210,8 @@ def numeric_column_max(data: pd.DataFrame, column: str, fallback: float = 0.0) -
     if values.empty:
         return fallback
     return max(float(values.max()), 0.0)
-
-
+ 
+ 
 def optional_limit(
     checkbox_label: str,
     input_label: str,
@@ -191,8 +232,8 @@ def optional_limit(
         help=help_text,
     )
     return float(value) if enabled else None
-
-
+ 
+ 
 def render_database_summary(stats: dict[str, Any]) -> None:
     brands_text = ", ".join(stats["brands"])
     st.success(
@@ -203,14 +244,14 @@ def render_database_summary(stats: dict[str, Any]) -> None:
         f'<div class="small-muted"><strong>Brands:</strong> {brands_text}</div>',
         unsafe_allow_html=True,
     )
-
+ 
     metrics = st.columns(5)
     metrics[0].metric("Rating rows", f'{stats["usable_rows"]:,}')
     metrics[1].metric("Brands", f'{stats["brand_count"]:,}')
     metrics[2].metric("Models", f'{stats["model_count"]:,}')
     metrics[3].metric("Rows with voltage", f'{stats["rows_with_voltage"]:,}')
     metrics[4].metric("Rows with frequency", f'{stats["rows_with_frequency"]:,}')
-
+ 
     with st.expander("Database coverage details", expanded=False):
         coverage = pd.DataFrame(
             [
@@ -227,12 +268,12 @@ def render_database_summary(stats: dict[str, Any]) -> None:
         st.dataframe(coverage, use_container_width=True, hide_index=True)
         if stats["ignored_columns"]:
             st.caption("Ignored non-data columns: " + ", ".join(stats["ignored_columns"]))
-
-
+ 
+ 
 def render_filter_summary(filters: dict[str, Any], exact_count: int, unverified_count: int) -> None:
     def list_text(values: list[Any] | None, all_text: str) -> str:
         return ", ".join(format_option(v) if isinstance(v, (int, float)) else str(v) for v in values) if values else all_text
-
+ 
     rows = [
         ("Brands", list_text(filters.get("brands"), "All brands")),
         ("Model search", filters.get("model_query") or "Not applied"),
@@ -244,8 +285,8 @@ def render_filter_summary(filters: dict[str, Any], exact_count: int, unverified_
         ("Unverified due to missing filtered data", unverified_count),
     ]
     st.dataframe(pd.DataFrame(rows, columns=["Filter", "Value"]), use_container_width=True, hide_index=True)
-
-
+ 
+ 
 def main() -> None:
     st.title(APP_TITLE)
     st.write(APP_DESCRIPTION)
@@ -255,25 +296,25 @@ def main() -> None:
         "score products, optimize selections, or provide engineering recommendations.</div>",
         unsafe_allow_html=True,
     )
-
+ 
     st.subheader("1. Upload generator database")
     uploaded_file = st.file_uploader(
         'Upload an .xlsx workbook containing the worksheet "Jeneratör Verileri".',
         type=["xlsx"],
         accept_multiple_files=False,
     )
-
+ 
     if uploaded_file is None:
         reset_results()
         st.info("Upload the prepared generator Excel database to activate the catalogue filters.")
         return
-
+ 
     file_bytes = uploaded_file.getvalue()
     file_id = sha256(file_bytes).hexdigest()
     if st.session_state.get("loaded_file_id") != file_id:
         reset_results(clear_filter_widgets=True)
         st.session_state["loaded_file_id"] = file_id
-
+ 
     try:
         with st.spinner("Reading and validating the Excel database..."):
             data, stats = cached_load_database(file_bytes)
@@ -285,14 +326,14 @@ def main() -> None:
         reset_results()
         st.error("The Excel database could not be processed due to an unexpected error.")
         return
-
+ 
     render_database_summary(stats)
-
+ 
     brands = text_options(data, "brand")
     voltages = numeric_options(data, "line_voltage_v")
     frequencies = numeric_options(data, "frequency_hz")
     imo_values = text_options(data, "imo")
-
+ 
     st.subheader("2. Product filters")
     top_left, top_right = st.columns(2)
     with top_left:
@@ -311,7 +352,7 @@ def main() -> None:
             key="model_query",
             help="Case-insensitive partial model-name search.",
         )
-
+ 
     with top_right:
         selected_voltages = st.multiselect(
             "Line-line voltage [V]",
@@ -329,7 +370,7 @@ def main() -> None:
             format_func=format_option,
             help="Leave empty to include all published frequency values.",
         )
-
+ 
     power_left, power_right = st.columns(2)
     with power_left:
         minimum_power = optional_limit(
@@ -347,7 +388,7 @@ def main() -> None:
             default_value=float(data["power_kw"].max()),
             step=10.0,
         )
-
+ 
     with st.expander("Advanced catalogue filters", expanded=False):
         st.caption(
             "When an enabled filter uses a field that is blank for a product, that product is not "
@@ -378,7 +419,7 @@ def main() -> None:
                 default_value=numeric_column_max(data, "height_mm"),
                 step=100.0,
             )
-
+ 
         weight1, weight2, fuel_col = st.columns(3)
         with weight1:
             maximum_dry_weight = optional_limit(
@@ -405,7 +446,7 @@ def main() -> None:
                 step=1.0,
                 help_text="Uses the published catalogue value only; it is not an efficiency recommendation.",
             )
-
+ 
         selected_imo = st.multiselect(
             "IMO / emission information",
             options=imo_values,
@@ -413,7 +454,7 @@ def main() -> None:
             key="selected_imo",
             help="Leave empty to include all published and blank IMO values.",
         )
-
+ 
     filters = {
         "brands": [] if all_brands else selected_brands,
         "model_query": model_query.strip(),
@@ -429,7 +470,7 @@ def main() -> None:
         "maximum_fuel_consumption_g_bkwh": maximum_fuel,
         "imo_values": selected_imo,
     }
-
+ 
     st.markdown("---")
     if st.button("Find generator products", type="primary", use_container_width=True):
         if not all_brands and not selected_brands:
@@ -446,24 +487,24 @@ def main() -> None:
                 st.session_state["filter_unverified"] = unverified
                 st.session_state["filter_values"] = filters
                 st.session_state["missing_filter_columns"] = missing_columns
-
+ 
     if "filter_result" not in st.session_state:
         st.caption("Results will appear only after you click Find generator products.")
         return
-
+ 
     exact = st.session_state["filter_result"]
     unverified = st.session_state["filter_unverified"]
     applied_filters = st.session_state["filter_values"]
     missing_filter_columns = st.session_state.get("missing_filter_columns", [])
-
+ 
     st.subheader("3. Filter results")
     result_metrics = st.columns(2)
     result_metrics[0].metric("Confirmed matching rating rows", f"{len(exact):,}")
     result_metrics[1].metric("Unverified rows with missing filtered data", f"{len(unverified):,}")
-
+ 
     with st.expander("Applied filter summary", expanded=False):
         render_filter_summary(applied_filters, len(exact), len(unverified))
-
+ 
     if missing_filter_columns:
         readable = [DISPLAY_NAMES.get(column, column) for column in missing_filter_columns]
         st.warning(
@@ -471,20 +512,15 @@ def main() -> None:
             + ", ".join(readable)
             + ". No confirmed match can be verified for those filters."
         )
-
+ 
     if exact.empty:
         st.warning(
             "No confirmed generator products were found with the selected catalogue filters. "
             "Try widening the power range, clearing one or more filters, or selecting additional brands."
         )
     else:
-        st.dataframe(
-            display_table(exact),
-            use_container_width=True,
-            height=min(650, 88 + 35 * min(len(exact), 16)),
-            hide_index=True,
-        )
-
+        render_grouped_results(exact)
+ 
         with st.expander("Product details and original database fields", expanded=False):
             detail_options = {
                 f'{row["brand"]} — {row["model"]} — {row["power_kw"]:,.1f} kW '
@@ -500,20 +536,15 @@ def main() -> None:
                 }
             )
             st.dataframe(details, use_container_width=True, hide_index=True)
-
+ 
     if not unverified.empty:
         with st.expander("Products with missing data for an enabled filter", expanded=False):
             st.warning(
                 "These rows satisfy the known criteria, but at least one enabled filter field is blank. "
                 "They are not confirmed matches and require catalogue verification."
             )
-            st.dataframe(
-                display_table(unverified),
-                use_container_width=True,
-                height=min(500, 88 + 35 * min(len(unverified), 12)),
-                hide_index=True,
-            )
-
+            render_grouped_results(unverified)
+ 
     if not exact.empty or not unverified.empty:
         try:
             export_bytes = cached_export(exact, applied_filters, unverified)
@@ -527,7 +558,7 @@ def main() -> None:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
-
-
+ 
+ 
 if __name__ == "__main__":
     main()
