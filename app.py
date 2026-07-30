@@ -103,6 +103,50 @@ st.markdown(
         }
  
         div[data-testid="stNumberInput"] input { border-radius: 8px; }
+ 
+        /* Title accent bar */
+        .app-header {
+            border-left: 6px solid #1D4ED8;
+            padding: 0.1rem 0 0.1rem 0.9rem;
+            margin-bottom: 0.2rem;
+        }
+        .app-header h1 { margin: 0; font-size: 1.9rem; color: #0B2545; }
+ 
+        /* Numbered step headers */
+        .section-head {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            margin: 1.7rem 0 0.5rem 0;
+        }
+        .section-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.9rem;
+            height: 1.9rem;
+            border-radius: 50%;
+            background: #1D4ED8;
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 0.95rem;
+            flex: 0 0 auto;
+        }
+        .section-title { color: #0B2545; font-size: 1.3rem; font-weight: 700; }
+ 
+        /* Colored result stat cards */
+        .stat-card {
+            display: flex;
+            gap: 0.9rem;
+            align-items: center;
+            border: 1px solid;
+            border-radius: 14px;
+            padding: 0.95rem 1.15rem;
+        }
+        .stat-icon { font-size: 1.7rem; line-height: 1; font-weight: 800; flex: 0 0 auto; }
+        .stat-value { font-size: 2rem; font-weight: 800; line-height: 1.05; }
+        .stat-label { font-weight: 700; color: #0B2545; font-size: 0.95rem; }
+        .stat-sub { color: #6B7280; font-size: 0.82rem; margin-top: 0.1rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -129,6 +173,40 @@ def format_option(value: float) -> str:
     """Display catalogue numeric options without unnecessary trailing zeros."""
     numeric = float(value)
     return f"{numeric:,.0f}" if numeric.is_integer() else f"{numeric:,.2f}".rstrip("0").rstrip(".")
+ 
+ 
+def section_header(number: str, title: str) -> None:
+    """Render a numbered, badge-style step header."""
+    st.markdown(
+        f'<div class="section-head">'
+        f'<span class="section-num">{number}</span>'
+        f'<span class="section-title">{title}</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+ 
+ 
+_STAT_PALETTE = {
+    # variant: (accent color, background, border, icon)
+    "match": ("#059669", "#ECFDF5", "#A7F3D0", "✓"),
+    "warn": ("#D97706", "#FFFBEB", "#FDE68A", "⚠"),
+    "muted": ("#6B7280", "#F3F4F6", "#E5E7EB", "—"),
+}
+ 
+ 
+def stat_card(container: Any, value: str, label: str, subtitle: str, variant: str) -> None:
+    """Render a colored at-a-glance stat card into the given column/container."""
+    color, background, border, icon = _STAT_PALETTE[variant]
+    container.markdown(
+        f'<div class="stat-card" style="background:{background}; border-color:{border};">'
+        f'<div class="stat-icon" style="color:{color};">{icon}</div>'
+        f'<div>'
+        f'<div class="stat-value" style="color:{color};">{value}</div>'
+        f'<div class="stat-label">{label}</div>'
+        f'<div class="stat-sub">{subtitle}</div>'
+        f"</div></div>",
+        unsafe_allow_html=True,
+    )
  
  
 _IMO_TIER_RE = re.compile(r"\b(III|II|I)\b")
@@ -207,7 +285,7 @@ def display_table(data: pd.DataFrame) -> pd.DataFrame:
     return table
  
  
-def render_grouped_results(data: pd.DataFrame) -> None:
+def render_grouped_results(data: pd.DataFrame, accent: str = "match") -> None:
     """Show one collapsible box per model; each box lists that model's rating rows.
  
     Rows that share a model but differ only by voltage/frequency (e.g. PP16V4000P63
@@ -215,8 +293,16 @@ def render_grouped_results(data: pd.DataFrame) -> None:
     is opened, each voltage/frequency variation is shown on its own line.
     """
     grouped = data.groupby(["brand", "model"], sort=False)
-    st.caption(f"{grouped.ngroups:,} model · {len(data):,} rating row(s)")
+    caption = f"{grouped.ngroups:,} model · {len(data):,} rating row(s)"
+    if accent == "warn":
+        st.markdown(
+            f'<div style="color:#D97706; font-size:0.9rem; margin-bottom:0.2rem;">{caption}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption(caption)
  
+    marker = "⚠ " if accent == "warn" else ""
     for (brand, model), group in grouped:
         count = len(group)
         powers = pd.to_numeric(group["power_kw"], errors="coerce").dropna()
@@ -228,7 +314,7 @@ def render_grouped_results(data: pd.DataFrame) -> None:
             power_text = f" · {powers.min():,.1f}–{powers.max():,.1f} kW"
  
         label = "rating" if count == 1 else "ratings"
-        header = f"{brand} — {model}   ·   {count} {label}{power_text}"
+        header = f"{marker}{brand} — {model}   ·   {count} {label}{power_text}"
  
         with st.expander(header, expanded=False):
             scenarios = display_table(group)
@@ -450,19 +536,28 @@ def model_count(data: pd.DataFrame) -> int:
  
 def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_columns: list[str]) -> None:
     """Render metrics, export, matches and unverified rows."""
-    st.subheader("3. Filter results")
+    section_header("3", "Filter results")
+ 
+    match_models = model_count(exact)
+    unverified_models = model_count(unverified)
  
     metric_left, metric_right = st.columns(2)
-    metric_left.metric(
+    stat_card(
+        metric_left,
+        f"{match_models:,}",
         "Matching models",
-        f"{model_count(exact):,}",
-        help="Distinct products that satisfy every applied filter (voltage/frequency variants of the same model count once).",
+        "Satisfy every applied filter" if match_models else "No products matched",
+        "match" if match_models else "muted",
     )
-    metric_right.metric(
+    stat_card(
+        metric_right,
+        f"{unverified_models:,}",
         "Unverified models",
-        f"{model_count(unverified):,}",
-        help="Distinct products that pass the known criteria but have a blank field used by an applied filter.",
+        "Need catalogue verification" if unverified_models else "None — all matches verified",
+        "warn" if unverified_models else "muted",
     )
+ 
+    st.write("")
  
     if not exact.empty or not unverified.empty:
         try:
@@ -471,7 +566,7 @@ def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_column
             st.error("The filtered Excel export could not be generated.")
         else:
             st.download_button(
-                "Export filtered results to Excel",
+                "⬇  Export filtered results to Excel",
                 data=export_bytes,
                 file_name="filtered_generator_catalog_results.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -492,23 +587,33 @@ def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_column
             "Try widening the power range or clearing one or more filters."
         )
     else:
-        render_grouped_results(exact)
+        st.markdown(
+            '<div style="color:#059669; font-weight:600; margin:0.6rem 0 0.2rem 0;">'
+            "✓ Confirmed matches — open a model to see its voltage / frequency ratings.</div>",
+            unsafe_allow_html=True,
+        )
+        render_grouped_results(exact, accent="match")
  
     if not unverified.empty:
-        with st.expander(f"Products with missing data for an applied filter ({model_count(unverified):,})", expanded=False):
-            st.caption(
-                "These rows satisfy the known criteria, but at least one applied filter field is "
-                "blank. They are not confirmed matches and require catalogue verification."
-            )
-            render_grouped_results(unverified)
+        st.markdown(
+            '<div style="color:#D97706; font-weight:600; margin:1.2rem 0 0.2rem 0;">'
+            f"⚠ {unverified_models:,} unverified model(s) — pass the known criteria, but a field "
+            "used by an applied filter is blank.</div>",
+            unsafe_allow_html=True,
+        )
+        if st.toggle("Show unverified models", value=False, key="show_unverified"):
+            render_grouped_results(unverified, accent="warn")
  
  
 def main() -> None:
-    st.title(APP_TITLE)
+    st.markdown(
+        f'<div class="app-header"><h1>⚙️ {APP_TITLE}</h1></div>',
+        unsafe_allow_html=True,
+    )
     st.caption(APP_DESCRIPTION)
     st.markdown(f'<div class="small-muted">{SCOPE_NOTE}</div>', unsafe_allow_html=True)
  
-    st.subheader("1. Upload generator database")
+    section_header("1", "Upload generator database")
     uploaded_file = st.file_uploader(
         'Upload an .xlsx workbook containing the worksheet "Jeneratör Verileri".',
         type=["xlsx"],
@@ -545,7 +650,7 @@ def main() -> None:
  
     imo_options, imo_option_to_raw = build_imo_options(data)
  
-    st.subheader("2. Product filters")
+    section_header("2", "Product filters")
     st.markdown(
         '<div class="small-muted">Every filter is optional — leave a field empty to ignore it.</div>',
         unsafe_allow_html=True,
