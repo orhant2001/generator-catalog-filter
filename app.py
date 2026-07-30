@@ -441,20 +441,27 @@ def render_filters(data: pd.DataFrame, imo_options: list[str]) -> dict[str, Any]
     }
  
  
+def model_count(data: pd.DataFrame) -> int:
+    """Count distinct brand + model products (rating rows that share a model count once)."""
+    if data.empty:
+        return 0
+    return int(data.groupby(["brand", "model"], sort=False).ngroups)
+ 
+ 
 def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_columns: list[str]) -> None:
     """Render metrics, export, matches and unverified rows."""
     st.subheader("3. Filter results")
  
     metric_left, metric_right = st.columns(2)
     metric_left.metric(
-        "Matching rating rows",
-        f"{len(exact):,}",
-        help="Rows that satisfy every applied filter.",
+        "Matching models",
+        f"{model_count(exact):,}",
+        help="Distinct products that satisfy every applied filter (voltage/frequency variants of the same model count once).",
     )
     metric_right.metric(
-        "Unverified rows",
-        f"{len(unverified):,}",
-        help="Rows that pass the known criteria but have a blank field used by an applied filter.",
+        "Unverified models",
+        f"{model_count(unverified):,}",
+        help="Distinct products that pass the known criteria but have a blank field used by an applied filter.",
     )
  
     if not exact.empty or not unverified.empty:
@@ -488,7 +495,7 @@ def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_column
         render_grouped_results(exact)
  
     if not unverified.empty:
-        with st.expander(f"Products with missing data for an applied filter ({len(unverified):,})", expanded=False):
+        with st.expander(f"Products with missing data for an applied filter ({model_count(unverified):,})", expanded=False):
             st.caption(
                 "These rows satisfy the known criteria, but at least one applied filter field is "
                 "blank. They are not confirmed matches and require catalogue verification."
