@@ -23,8 +23,11 @@ from data_utils import (
  
 APP_TITLE = "Marine Generator Catalog Filter"
 APP_DESCRIPTION = (
-    "A simple catalogue filtering tool for listing marine generator product "
-    "ratings from an Excel database according to user-selected technical criteria."
+    "Filter marine generator product ratings from an Excel catalogue by technical criteria."
+)
+SCOPE_NOTE = (
+    "Catalogue filtering only — it lists published product ratings and does not size a ship "
+    "electrical system, choose quantities, or provide engineering recommendations."
 )
  
  
@@ -40,7 +43,7 @@ st.markdown(
     """
     <style>
         .stApp { background-color: #FFFFFF; color: #111827; }
-        .block-container { max-width: 1500px; padding-top: 2rem; padding-bottom: 3rem; }
+        .block-container { max-width: 1400px; padding-top: 2rem; padding-bottom: 3rem; }
         h1, h2, h3 { color: #0B2545; }
         div[data-testid="stMetric"] {
             background: #F7F9FC;
@@ -64,17 +67,9 @@ st.markdown(
             color: #0B2545;
             font-weight: 600;
         }
-        .catalog-note {
-            background: #F7F9FC;
-            border-left: 4px solid #1D4ED8;
-            border-radius: 6px;
-            padding: 0.85rem 1rem;
-            margin: 0.5rem 0 1rem 0;
-        }
         .small-muted { color: #6B7280; font-size: 0.9rem; }
  
-        /* Section label styling for ##### headers used inside the filter form */
-        h4 { color: #0B2545; }
+        /* Section labels for the ##### headers used inside the filter form */
         h5 {
             color: #1D4ED8;
             font-size: 0.82rem !important;
@@ -83,16 +78,7 @@ st.markdown(
             letter-spacing: 0.06em;
             border-bottom: 1px solid #E5E7EB;
             padding-bottom: 0.35rem;
-            margin: 1.4rem 0 0.6rem 0;
-        }
- 
-        /* Filter card: wraps the whole filter form in a soft panel */
-        .filter-card {
-            background: #FBFCFE;
-            border: 1px solid #E5E7EB;
-            border-radius: 14px;
-            padding: 0.4rem 1.25rem 1rem 1.25rem;
-            margin-bottom: 0.5rem;
+            margin: 1.2rem 0 0.6rem 0;
         }
  
         /* Rounded, bordered expanders */
@@ -110,13 +96,12 @@ st.markdown(
             border-radius: 6px !important;
         }
  
-        /* Blue slider track/handle */
+        /* Blue slider handle */
         div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {
             background-color: #1D4ED8 !important;
             border-color: #1D4ED8 !important;
         }
  
-        /* Tidy number inputs */
         div[data-testid="stNumberInput"] input { border-radius: 8px; }
     </style>
     """,
@@ -230,10 +215,7 @@ def render_grouped_results(data: pd.DataFrame) -> None:
     is opened, each voltage/frequency variation is shown on its own line.
     """
     grouped = data.groupby(["brand", "model"], sort=False)
-    st.caption(
-        f"{grouped.ngroups:,} model · {len(data):,} rating row(s) — the same model can "
-        "repeat for different voltage / frequency options."
-    )
+    st.caption(f"{grouped.ngroups:,} model · {len(data):,} rating row(s)")
  
     for (brand, model), group in grouped:
         count = len(group)
@@ -327,114 +309,11 @@ def max_number_filter(
     return float(value) if value is not None else None
  
  
-def render_database_summary(stats: dict[str, Any]) -> None:
-    brands_text = ", ".join(stats["brands"])
-    st.success(
-        f'Database loaded: {stats["usable_rows"]:,} generator rating rows — '
-        f'{stats["brand_count"]:,} brands.'
-    )
-    st.markdown(
-        f'<div class="small-muted"><strong>Brands:</strong> {brands_text}</div>',
-        unsafe_allow_html=True,
-    )
- 
-    metrics = st.columns(5)
-    metrics[0].metric("Rating rows", f'{stats["usable_rows"]:,}')
-    metrics[1].metric("Brands", f'{stats["brand_count"]:,}')
-    metrics[2].metric("Models", f'{stats["model_count"]:,}')
-    metrics[3].metric("Rows with voltage", f'{stats["rows_with_voltage"]:,}')
-    metrics[4].metric("Rows with frequency", f'{stats["rows_with_frequency"]:,}')
- 
-    with st.expander("Database coverage details", expanded=False):
-        coverage = pd.DataFrame(
-            [
-                ("Original worksheet rows", stats["original_rows"]),
-                ("Usable rating rows", stats["usable_rows"]),
-                ("Rows with complete dimensions", stats["rows_with_complete_dimensions"]),
-                ("Rows with dry weight", stats["rows_with_dry_weight"]),
-                ("Rows with wet weight", stats["rows_with_wet_weight"]),
-                ("Rows excluded for invalid/missing power", stats["invalid_power_rows"]),
-                ("Rows excluded for missing brand/model", stats["missing_identity_rows"]),
-            ],
-            columns=["Database measure", "Rows"],
-        )
-        st.dataframe(coverage, use_container_width=True, hide_index=True)
-        if stats["ignored_columns"]:
-            st.caption("Ignored non-data columns: " + ", ".join(stats["ignored_columns"]))
- 
- 
-def render_filter_summary(filters: dict[str, Any], exact_count: int, unverified_count: int) -> None:
-    def list_text(values: list[Any] | None, all_text: str) -> str:
-        return ", ".join(format_option(v) if isinstance(v, (int, float)) else str(v) for v in values) if values else all_text
- 
-    rows = [
-        ("Brands", list_text(filters.get("brands"), "All brands")),
-        ("Model search", filters.get("model_query") or "Not applied"),
-        ("Minimum power [kW]", filters.get("minimum_power_kw") if filters.get("minimum_power_kw") is not None else "Not applied"),
-        ("Maximum power [kW]", filters.get("maximum_power_kw") if filters.get("maximum_power_kw") is not None else "Not applied"),
-        ("Voltages [V]", list_text(filters.get("voltages_v"), "All voltages")),
-        ("Frequencies [Hz]", list_text(filters.get("frequencies_hz"), "All frequencies")),
-        ("Confirmed matches", exact_count),
-        ("Unverified due to missing filtered data", unverified_count),
-    ]
-    st.dataframe(pd.DataFrame(rows, columns=["Filter", "Value"]), use_container_width=True, hide_index=True)
- 
- 
-def main() -> None:
-    st.title(APP_TITLE)
-    st.write(APP_DESCRIPTION)
-    st.markdown(
-        '<div class="catalog-note">This application filters catalogue records only. '
-        "It does not size a ship electrical system, calculate generator quantity, "
-        "score products, optimize selections, or provide engineering recommendations.</div>",
-        unsafe_allow_html=True,
-    )
- 
-    st.subheader("1. Upload generator database")
-    uploaded_file = st.file_uploader(
-        'Upload an .xlsx workbook containing the worksheet "Jeneratör Verileri".',
-        type=["xlsx"],
-        accept_multiple_files=False,
-    )
- 
-    if uploaded_file is None:
-        reset_results()
-        st.info("Upload the prepared generator Excel database to activate the catalogue filters.")
-        return
- 
-    file_bytes = uploaded_file.getvalue()
-    file_id = sha256(file_bytes).hexdigest()
-    if st.session_state.get("loaded_file_id") != file_id:
-        reset_results(clear_filter_widgets=True)
-        st.session_state["loaded_file_id"] = file_id
- 
-    try:
-        with st.spinner("Reading and validating the Excel database..."):
-            data, stats = cached_load_database(file_bytes)
-    except DataError as exc:
-        reset_results()
-        st.error(str(exc))
-        return
-    except Exception:
-        reset_results()
-        st.error("The Excel database could not be processed due to an unexpected error.")
-        return
- 
-    render_database_summary(stats)
- 
+def render_filters(data: pd.DataFrame, imo_options: list[str]) -> dict[str, Any]:
+    """Render the full filter form and return a raw (pre-expansion) selections dict."""
     brands = text_options(data, "brand")
     voltages = numeric_options(data, "line_voltage_v")
     frequencies = numeric_options(data, "frequency_hz")
-    imo_options, imo_option_to_raw = build_imo_options(data)
- 
-    st.subheader("2. Product filters")
-    st.markdown(
-        '<div class="small-muted">Every filter is optional. Leave a field empty to ignore it — '
-        "an empty brand, voltage, or frequency selection includes all values.</div>",
-        unsafe_allow_html=True,
-    )
- 
-    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
  
     st.markdown("##### Identification")
     id_left, id_right = st.columns(2)
@@ -545,20 +424,7 @@ def main() -> None:
             ),
         )
  
-    st.markdown("</div>", unsafe_allow_html=True)
- 
-    # Expand tier selections (e.g. "IMO Tier II") into the exact raw catalogue
-    # strings they cover (e.g. "IMO II", "IMO Tier II / IMO Tier III"), so matching
-    # stays exact and the stored/displayed data is never modified.
-    expanded_imo_values = sorted(
-        {
-            raw
-            for option in selected_imo
-            for raw in imo_option_to_raw.get(option, {option})
-        }
-    )
- 
-    filters = {
+    return {
         "brands": selected_brands,
         "model_query": model_query.strip(),
         "minimum_power_kw": minimum_power,
@@ -571,11 +437,137 @@ def main() -> None:
         "maximum_dry_weight_kg": maximum_dry_weight,
         "maximum_wet_weight_kg": maximum_wet_weight,
         "maximum_fuel_consumption_g_bkwh": maximum_fuel,
-        "imo_values": expanded_imo_values,
+        "selected_imo": selected_imo,
     }
  
-    st.markdown("---")
-    if st.button("Find generator products", type="primary", use_container_width=True):
+ 
+def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_columns: list[str]) -> None:
+    """Render metrics, export, matches and unverified rows."""
+    st.subheader("3. Filter results")
+ 
+    metric_left, metric_right = st.columns(2)
+    metric_left.metric(
+        "Matching rating rows",
+        f"{len(exact):,}",
+        help="Rows that satisfy every applied filter.",
+    )
+    metric_right.metric(
+        "Unverified rows",
+        f"{len(unverified):,}",
+        help="Rows that pass the known criteria but have a blank field used by an applied filter.",
+    )
+ 
+    if not exact.empty or not unverified.empty:
+        try:
+            export_bytes = cached_export(exact, st.session_state["filter_values"], unverified)
+        except Exception:
+            st.error("The filtered Excel export could not be generated.")
+        else:
+            st.download_button(
+                "Export filtered results to Excel",
+                data=export_bytes,
+                file_name="filtered_generator_catalog_results.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+ 
+    if missing_columns:
+        readable = [DISPLAY_NAMES.get(column, column) for column in missing_columns]
+        st.warning(
+            "The uploaded database does not contain the following enabled filter column(s): "
+            + ", ".join(readable)
+            + ". No confirmed match can be verified for those filters."
+        )
+ 
+    if exact.empty:
+        st.warning(
+            "No confirmed generator products were found with the selected filters. "
+            "Try widening the power range or clearing one or more filters."
+        )
+    else:
+        render_grouped_results(exact)
+ 
+    if not unverified.empty:
+        with st.expander(f"Products with missing data for an applied filter ({len(unverified):,})", expanded=False):
+            st.caption(
+                "These rows satisfy the known criteria, but at least one applied filter field is "
+                "blank. They are not confirmed matches and require catalogue verification."
+            )
+            render_grouped_results(unverified)
+ 
+ 
+def main() -> None:
+    st.title(APP_TITLE)
+    st.caption(APP_DESCRIPTION)
+    st.markdown(f'<div class="small-muted">{SCOPE_NOTE}</div>', unsafe_allow_html=True)
+ 
+    st.subheader("1. Upload generator database")
+    uploaded_file = st.file_uploader(
+        'Upload an .xlsx workbook containing the worksheet "Jeneratör Verileri".',
+        type=["xlsx"],
+        accept_multiple_files=False,
+    )
+ 
+    if uploaded_file is None:
+        reset_results()
+        st.info("Upload the prepared generator Excel database to activate the catalogue filters.")
+        return
+ 
+    file_bytes = uploaded_file.getvalue()
+    file_id = sha256(file_bytes).hexdigest()
+    if st.session_state.get("loaded_file_id") != file_id:
+        reset_results(clear_filter_widgets=True)
+        st.session_state["loaded_file_id"] = file_id
+ 
+    try:
+        with st.spinner("Reading and validating the Excel database..."):
+            data, stats = cached_load_database(file_bytes)
+    except DataError as exc:
+        reset_results()
+        st.error(str(exc))
+        return
+    except Exception:
+        reset_results()
+        st.error("The Excel database could not be processed due to an unexpected error.")
+        return
+ 
+    st.success(
+        f'Loaded {stats["usable_rows"]:,} rating rows across '
+        f'{stats["brand_count"]:,} brands and {stats["model_count"]:,} models.'
+    )
+ 
+    imo_options, imo_option_to_raw = build_imo_options(data)
+ 
+    st.subheader("2. Product filters")
+    st.markdown(
+        '<div class="small-muted">Every filter is optional — leave a field empty to ignore it.</div>',
+        unsafe_allow_html=True,
+    )
+ 
+    with st.container(border=True):
+        raw_filters = render_filters(data, imo_options)
+ 
+    # Expand tier selections (e.g. "IMO Tier II") into the exact raw catalogue
+    # strings they cover (e.g. "IMO II", "IMO Tier II / IMO Tier III"), so matching
+    # stays exact and the stored/displayed data is never modified.
+    expanded_imo_values = sorted(
+        {
+            raw
+            for option in raw_filters.pop("selected_imo")
+            for raw in imo_option_to_raw.get(option, {option})
+        }
+    )
+    filters = {**raw_filters, "imo_values": expanded_imo_values}
+ 
+    find_col, reset_col = st.columns([3, 1])
+    find_clicked = find_col.button(
+        "Find generator products", type="primary", use_container_width=True
+    )
+    if reset_col.button("Reset filters", use_container_width=True):
+        reset_results(clear_filter_widgets=True)
+        st.rerun()
+ 
+    if find_clicked:
         try:
             exact, unverified, missing_columns = filter_catalog(data, filters)
         except ValueError as exc:
@@ -589,75 +581,14 @@ def main() -> None:
             st.session_state["missing_filter_columns"] = missing_columns
  
     if "filter_result" not in st.session_state:
-        st.caption("Results will appear only after you click Find generator products.")
+        st.caption("Results will appear after you click Find generator products.")
         return
  
-    exact = st.session_state["filter_result"]
-    unverified = st.session_state["filter_unverified"]
-    applied_filters = st.session_state["filter_values"]
-    missing_filter_columns = st.session_state.get("missing_filter_columns", [])
- 
-    st.subheader("3. Filter results")
-    result_metrics = st.columns(2)
-    result_metrics[0].metric("Confirmed matching rating rows", f"{len(exact):,}")
-    result_metrics[1].metric("Unverified rows with missing filtered data", f"{len(unverified):,}")
- 
-    with st.expander("Applied filter summary", expanded=False):
-        render_filter_summary(applied_filters, len(exact), len(unverified))
- 
-    if missing_filter_columns:
-        readable = [DISPLAY_NAMES.get(column, column) for column in missing_filter_columns]
-        st.warning(
-            "The uploaded database does not contain the following enabled filter column(s): "
-            + ", ".join(readable)
-            + ". No confirmed match can be verified for those filters."
-        )
- 
-    if exact.empty:
-        st.warning(
-            "No confirmed generator products were found with the selected catalogue filters. "
-            "Try widening the power range, clearing one or more filters, or selecting additional brands."
-        )
-    else:
-        render_grouped_results(exact)
- 
-        with st.expander("Product details and original database fields", expanded=False):
-            detail_options = {
-                f'{row["brand"]} — {row["model"]} — {row["power_kw"]:,.1f} kW '
-                f'(Excel row {int(row["database_row"])})': index
-                for index, row in exact.iterrows()
-            }
-            selected_label = st.selectbox("Select a rating row", options=list(detail_options))
-            selected_row = exact.loc[detail_options[selected_label]].drop(labels=["database_row"], errors="ignore")
-            details = pd.DataFrame(
-                {
-                    "Field": [DISPLAY_NAMES.get(column, column.replace("_", " ").title()) for column in selected_row.index],
-                    "Value": ["Not available" if pd.isna(value) else value for value in selected_row.values],
-                }
-            )
-            st.dataframe(details, use_container_width=True, hide_index=True)
- 
-    if not unverified.empty:
-        with st.expander("Products with missing data for an enabled filter", expanded=False):
-            st.warning(
-                "These rows satisfy the known criteria, but at least one enabled filter field is blank. "
-                "They are not confirmed matches and require catalogue verification."
-            )
-            render_grouped_results(unverified)
- 
-    if not exact.empty or not unverified.empty:
-        try:
-            export_bytes = cached_export(exact, applied_filters, unverified)
-        except Exception:
-            st.error("The filtered Excel export could not be generated.")
-        else:
-            st.download_button(
-                "Export filtered results to Excel",
-                data=export_bytes,
-                file_name="filtered_generator_catalog_results.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
+    render_results(
+        st.session_state["filter_result"],
+        st.session_state["filter_unverified"],
+        st.session_state.get("missing_filter_columns", []),
+    )
  
  
 if __name__ == "__main__":
