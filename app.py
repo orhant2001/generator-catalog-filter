@@ -45,12 +45,6 @@ st.markdown(
         .stApp { background-color: #FFFFFF; color: #111827; }
         .block-container { max-width: 1400px; padding-top: 2rem; padding-bottom: 3rem; }
         h1, h2, h3 { color: #0B2545; }
-        div[data-testid="stMetric"] {
-            background: #F7F9FC;
-            border: 1px solid #E5E7EB;
-            border-radius: 10px;
-            padding: 0.9rem 1rem;
-        }
         div[data-testid="stFileUploader"] {
             background: #F7F9FC;
             border: 1px solid #E5E7EB;
@@ -465,9 +459,8 @@ def render_filters(data: pd.DataFrame, imo_options: list[str]) -> dict[str, Any]
  
     st.markdown("##### Size, weight, fuel & emissions")
     st.caption(
-        "Enter a maximum value to apply a limit, or leave a field blank to ignore it. "
-        "If an applied limit uses a field that is blank for a product, that product is listed "
-        "separately as unverified rather than as a confirmed match."
+        "Enter a maximum to apply a limit, or leave a field blank to ignore it. Products with a "
+        "blank value for an applied limit are listed separately as unverified."
     )
  
     st.markdown("**Maximum dimensions [mm]**")
@@ -534,6 +527,22 @@ def model_count(data: pd.DataFrame) -> int:
     return int(data.groupby(["brand", "model"], sort=False).ngroups)
  
  
+SORT_MODES = ("Match order", "Power (low → high)", "Power (high → low)", "Brand / model (A–Z)")
+ 
+ 
+def sort_for_display(data: pd.DataFrame, mode: str) -> pd.DataFrame:
+    """Reorder rating rows for display; groups then follow first-appearance order."""
+    if data.empty or mode == "Match order":
+        return data
+    if mode == "Power (low → high)":
+        return data.sort_values("power_kw", kind="stable")
+    if mode == "Power (high → low)":
+        return data.sort_values("power_kw", ascending=False, kind="stable")
+    if mode == "Brand / model (A–Z)":
+        return data.sort_values(["brand", "model"], kind="stable")
+    return data
+ 
+ 
 def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_columns: list[str]) -> None:
     """Render metrics, export, matches and unverified rows."""
     section_header("3", "Filter results")
@@ -580,6 +589,12 @@ def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_column
             + ", ".join(readable)
             + ". No confirmed match can be verified for those filters."
         )
+ 
+    if not exact.empty or not unverified.empty:
+        sort_col, _ = st.columns([2, 3])
+        sort_mode = sort_col.selectbox("Sort models by", SORT_MODES, key="results_sort")
+        exact = sort_for_display(exact, sort_mode)
+        unverified = sort_for_display(unverified, sort_mode)
  
     if exact.empty:
         st.warning(
@@ -695,6 +710,11 @@ def main() -> None:
     if "filter_result" not in st.session_state:
         st.caption("Results will appear after you click Find generator products.")
         return
+ 
+    if st.session_state.get("filter_values") != filters:
+        st.warning(
+            "Filters have changed since these results — click **Find generator products** to refresh."
+        )
  
     render_results(
         st.session_state["filter_result"],
