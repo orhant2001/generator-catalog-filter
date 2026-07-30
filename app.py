@@ -42,13 +42,13 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-        .stApp { background-color: #FFFFFF; color: #111827; }
+        .stApp { background-color: #F4F7FB; color: #1F2937; }
         .block-container { max-width: 1400px; padding-top: 2rem; padding-bottom: 3rem; }
         h1, h2, h3 { color: #0B2545; }
         div[data-testid="stFileUploader"] {
-            background: #F7F9FC;
-            border: 1px solid #E5E7EB;
-            border-radius: 10px;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
             padding: 0.8rem;
         }
         div.stButton > button[kind="primary"] {
@@ -65,14 +65,14 @@ st.markdown(
  
         /* Section labels for the ##### headers used inside the filter form */
         h5 {
-            color: #1D4ED8;
-            font-size: 0.82rem !important;
+            color: #2563EB;
+            font-size: 0.78rem !important;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            border-bottom: 1px solid #E5E7EB;
-            padding-bottom: 0.35rem;
-            margin: 1.2rem 0 0.6rem 0;
+            letter-spacing: 0.07em;
+            border-bottom: 1px solid #EEF2F7;
+            padding-bottom: 0.3rem;
+            margin: 1.1rem 0 0.55rem 0;
         }
  
         /* Rounded, bordered expanders */
@@ -104,29 +104,34 @@ st.markdown(
             padding: 0.1rem 0 0.1rem 0.9rem;
             margin-bottom: 0.2rem;
         }
-        .app-header h1 { margin: 0; font-size: 1.9rem; color: #0B2545; }
+        .app-header h1 { margin: 0; font-size: 2rem; font-weight: 700; color: #0B2545; letter-spacing: -0.01em; }
  
-        /* Numbered step headers */
+        /* Numbered step headers as a colored band */
         .section-head {
             display: flex;
             align-items: center;
-            gap: 0.65rem;
-            margin: 1.7rem 0 0.5rem 0;
+            gap: 0.7rem;
+            background: #EAF1FE;
+            border: 1px solid #D5E3FB;
+            border-left: 5px solid #1D4ED8;
+            border-radius: 10px;
+            padding: 0.6rem 0.95rem;
+            margin: 1.9rem 0 0.85rem 0;
         }
         .section-num {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 1.9rem;
-            height: 1.9rem;
+            width: 1.75rem;
+            height: 1.75rem;
             border-radius: 50%;
             background: #1D4ED8;
             color: #FFFFFF;
             font-weight: 700;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             flex: 0 0 auto;
         }
-        .section-title { color: #0B2545; font-size: 1.3rem; font-weight: 700; }
+        .section-title { color: #0B2545; font-size: 1.2rem; font-weight: 700; letter-spacing: 0.01em; }
  
         /* Colored result stat cards */
         .stat-card {
@@ -138,9 +143,41 @@ st.markdown(
             padding: 0.95rem 1.15rem;
         }
         .stat-icon { font-size: 1.7rem; line-height: 1; font-weight: 800; flex: 0 0 auto; }
-        .stat-value { font-size: 2rem; font-weight: 800; line-height: 1.05; }
-        .stat-label { font-weight: 700; color: #0B2545; font-size: 0.95rem; }
-        .stat-sub { color: #6B7280; font-size: 0.82rem; margin-top: 0.1rem; }
+        .stat-value { font-size: 2.15rem; font-weight: 800; line-height: 1.05; }
+        .stat-label { font-weight: 700; color: #0B2545; font-size: 0.98rem; }
+        .stat-sub { color: #64748B; font-size: 0.82rem; margin-top: 0.15rem; }
+ 
+        /* Bordered containers render as white cards that lift off the tinted page */
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 14px;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        }
+ 
+        /* Slightly bolder, darker widget labels for a clearer hierarchy */
+        div[data-testid="stWidgetLabel"] p {
+            font-weight: 600;
+            color: #1E293B;
+            font-size: 0.9rem;
+        }
+ 
+        /* Colored result-group banners */
+        .result-banner {
+            border-radius: 10px;
+            padding: 0.55rem 0.9rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin: 0.9rem 0 0.5rem 0;
+        }
+        .result-banner.match { background: #ECFDF5; color: #065F46; border-left: 4px solid #059669; }
+        .result-banner.warn { background: #FFFBEB; color: #92400E; border-left: 4px solid #D97706; }
+ 
+        /* Softer, lifted expanders */
+        div[data-testid="stExpander"] { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+ 
+        /* Success/warning/info callouts a touch rounder */
+        div[data-testid="stAlert"] { border-radius: 10px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -603,7 +640,7 @@ def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_column
         )
     else:
         st.markdown(
-            '<div style="color:#059669; font-weight:600; margin:0.6rem 0 0.2rem 0;">'
+            '<div class="result-banner match">'
             "✓ Confirmed matches — open a model to see its voltage / frequency ratings.</div>",
             unsafe_allow_html=True,
         )
@@ -611,7 +648,7 @@ def render_results(exact: pd.DataFrame, unverified: pd.DataFrame, missing_column
  
     if not unverified.empty:
         st.markdown(
-            '<div style="color:#D97706; font-weight:600; margin:1.2rem 0 0.2rem 0;">'
+            '<div class="result-banner warn">'
             f"⚠ {unverified_models:,} unverified model(s) — pass the known criteria, but a field "
             "used by an applied filter is blank.</div>",
             unsafe_allow_html=True,
