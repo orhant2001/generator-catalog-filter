@@ -32,7 +32,7 @@ jobs:
         run: |
           python -m py_compile app.py data_utils.py launcher.py
 
-      - name: Build Windows package
+      - name: Build Windows package (slim)
         shell: pwsh
         run: |
           pyinstaller `
@@ -41,8 +41,21 @@ jobs:
             --onedir `
             --name "GeneratorCatalogFilter" `
             --collect-all streamlit `
-            --collect-all pyarrow `
+            --collect-submodules pyarrow `
+            --collect-data pyarrow `
             --add-data "app.py;." `
+            --exclude-module matplotlib `
+            --exclude-module tkinter `
+            --exclude-module PyQt5 `
+            --exclude-module PyQt6 `
+            --exclude-module PySide2 `
+            --exclude-module PySide6 `
+            --exclude-module IPython `
+            --exclude-module jupyter `
+            --exclude-module notebook `
+            --exclude-module pytest `
+            --exclude-module pyarrow.tests `
+            --exclude-module pandas.tests `
             launcher.py
 
       - name: Verify executable
@@ -51,11 +64,25 @@ jobs:
           if (-not (Test-Path "dist\GeneratorCatalogFilter\GeneratorCatalogFilter.exe")) {
             throw "GeneratorCatalogFilter.exe was not created."
           }
+          $size = (Get-ChildItem -Recurse "dist\GeneratorCatalogFilter" | Measure-Object -Property Length -Sum).Sum / 1MB
+          Write-Host ("Unzipped package size: {0:N1} MB" -f $size)
 
-      - name: Upload Windows package
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          if (-not (Test-Path "Output\GeneratorCatalogFilter-Setup.exe")) {
+            throw "Installer was not created."
+          }
+
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: GeneratorCatalogFilter-Windows
-          path: dist/GeneratorCatalogFilter/
+          name: GeneratorCatalogFilter-Setup
+          path: Output/GeneratorCatalogFilter-Setup.exe
           retention-days: 30
           if-no-files-found: error
