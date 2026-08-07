@@ -20,7 +20,6 @@ from data_utils import (
     text_options,
 )
 
-
 APP_TITLE = "Marine Generator Catalog Filter"
 APP_DESCRIPTION = (
     "Filter marine generator product ratings from an Excel catalogue by technical criteria."
@@ -29,7 +28,6 @@ SCOPE_NOTE = (
     "Catalogue filtering only — it lists published product ratings and does not size a ship "
     "electrical system, choose quantities, or provide engineering recommendations."
 )
-
 
 st.set_page_config(
     page_title=APP_TITLE,
@@ -41,105 +39,97 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-        .stApp { background-color: #FFFFFF; color: #111827; }
-        .block-container { max-width: 1400px; padding-top: 2rem; padding-bottom: 3rem; }
-        h1, h2, h3 { color: #0B2545; }
-        div[data-testid="stFileUploader"] {
-            background: #F7F9FC;
-            border: 1px solid #E5E7EB;
-            border-radius: 10px;
-            padding: 0.8rem;
-        }
-        div.stButton > button[kind="primary"] {
-            background-color: #1D4ED8;
-            border-color: #1D4ED8;
-            font-weight: 600;
-        }
-        div.stDownloadButton > button {
-            border-color: #1D4ED8;
-            color: #0B2545;
-            font-weight: 600;
-        }
-        .small-muted { color: #6B7280; font-size: 0.9rem; }
-
-        /* Section labels for the ##### headers used inside the filter form */
-        h5 {
-            color: #1D4ED8;
-            font-size: 0.82rem !important;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            border-bottom: 1px solid #E5E7EB;
-            padding-bottom: 0.35rem;
-            margin: 1.2rem 0 0.6rem 0;
-        }
-
-        /* Rounded, bordered expanders */
-        div[data-testid="stExpander"] {
-            border: 1px solid #E5E7EB;
-            border-radius: 12px;
-            background: #FFFFFF;
-            overflow: hidden;
-        }
-        div[data-testid="stExpander"] summary { font-weight: 600; color: #0B2545; }
-
-        /* Blue chips for multiselect selections */
-        span[data-baseweb="tag"] {
-            background-color: #1D4ED8 !important;
-            border-radius: 6px !important;
-        }
-
-        /* Blue slider handle */
-        div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {
-            background-color: #1D4ED8 !important;
-            border-color: #1D4ED8 !important;
-        }
-
-        div[data-testid="stNumberInput"] input { border-radius: 8px; }
-
-        /* Title accent bar */
-        .app-header {
-            border-left: 6px solid #1D4ED8;
-            padding: 0.1rem 0 0.1rem 0.9rem;
-            margin-bottom: 0.2rem;
-        }
-        .app-header h1 { margin: 0; font-size: 1.9rem; color: #0B2545; }
-
-        /* Numbered step headers */
-        .section-head {
-            display: flex;
-            align-items: center;
-            gap: 0.65rem;
-            margin: 1.7rem 0 0.5rem 0;
-        }
-        .section-num {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.9rem;
-            height: 1.9rem;
-            border-radius: 50%;
-            background: #1D4ED8;
-            color: #FFFFFF;
-            font-weight: 700;
-            font-size: 0.95rem;
-            flex: 0 0 auto;
-        }
-        .section-title { color: #0B2545; font-size: 1.3rem; font-weight: 700; }
-
-        /* Colored result stat cards */
-        .stat-card {
-            display: flex;
-            gap: 0.9rem;
-            align-items: center;
-            border: 1px solid;
-            border-radius: 14px;
-            padding: 0.95rem 1.15rem;
-        }
-        .stat-icon { font-size: 1.7rem; line-height: 1; font-weight: 800; flex: 0 0 auto; }
-        .stat-value { font-size: 2rem; font-weight: 800; line-height: 1.05; }
-        .stat-label { font-weight: 700; color: #0B2545; font-size: 0.95rem; }
-        .stat-sub { color: #6B7280; font-size: 0.82rem; margin-top: 0.1rem; }
+    .stApp { background-color: #FFFFFF; color: #111827; }
+    .block-container { max-width: 1400px; padding-top: 2rem; padding-bottom: 3rem; }
+    h1, h2, h3 { color: #0B2545; }
+    div[data-testid="stFileUploader"] {
+        background: #F7F9FC;
+        border: 1px solid #E5E7EB;
+        border-radius: 10px;
+        padding: 0.8rem;
+    }
+    div.stButton > button[kind="primary"] {
+        background-color: #1D4ED8;
+        border-color: #1D4ED8;
+        font-weight: 600;
+    }
+    div.stDownloadButton > button {
+        border-color: #1D4ED8;
+        color: #0B2545;
+        font-weight: 600;
+    }
+    .small-muted { color: #6B7280; font-size: 0.9rem; }
+    /* Section labels for the ##### headers used inside the filter form */
+    h5 {
+        color: #1D4ED8;
+        font-size: 0.82rem !important;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        border-bottom: 1px solid #E5E7EB;
+        padding-bottom: 0.35rem;
+        margin: 1.2rem 0 0.6rem 0;
+    }
+    /* Rounded, bordered expanders */
+    div[data-testid="stExpander"] {
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        background: #FFFFFF;
+        overflow: hidden;
+    }
+    div[data-testid="stExpander"] summary { font-weight: 600; color: #0B2545; }
+    /* Blue chips for multiselect selections */
+    span[data-baseweb="tag"] {
+        background-color: #1D4ED8 !important;
+        border-radius: 6px !important;
+    }
+    /* Blue slider handle */
+    div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {
+        background-color: #1D4ED8 !important;
+        border-color: #1D4ED8 !important;
+    }
+    div[data-testid="stNumberInput"] input { border-radius: 8px; }
+    /* Title accent bar */
+    .app-header {
+        border-left: 6px solid #1D4ED8;
+        padding: 0.1rem 0 0.1rem 0.9rem;
+        margin-bottom: 0.2rem;
+    }
+    .app-header h1 { margin: 0; font-size: 1.9rem; color: #0B2545; }
+    /* Numbered step headers */
+    .section-head {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        margin: 1.7rem 0 0.5rem 0;
+    }
+    .section-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.9rem;
+        height: 1.9rem;
+        border-radius: 50%;
+        background: #1D4ED8;
+        color: #FFFFFF;
+        font-weight: 700;
+        font-size: 0.95rem;
+        flex: 0 0 auto;
+    }
+    .section-title { color: #0B2545; font-size: 1.3rem; font-weight: 700; }
+    /* Colored result stat cards */
+    .stat-card {
+        display: flex;
+        gap: 0.9rem;
+        align-items: center;
+        border: 1px solid;
+        border-radius: 14px;
+        padding: 0.95rem 1.15rem;
+    }
+    .stat-icon { font-size: 1.7rem; line-height: 1; font-weight: 800; flex: 0 0 auto; }
+    .stat-value { font-size: 2rem; font-weight: 800; line-height: 1.05; }
+    .stat-label { font-weight: 700; color: #0B2545; font-size: 0.95rem; }
+    .stat-sub { color: #6B7280; font-size: 0.82rem; margin-top: 0.1rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -215,13 +205,13 @@ def stat_card(container: Any, value: str, label: str, subtitle: str, variant: st
 #
 # A single raw cell may belong to multiple accepted classes:
 #
-#   IMO Tier III / EPA 4 (COM) / Stage V
+#     IMO Tier III / EPA 4 (COM) / Stage V
 #
 # is mapped to:
 #
-#   IMO Tier III
-#   EPA Tier 4
-#   EU Stage V
+#     IMO Tier III
+#     EPA Tier 4
+#     EU Stage V
 #
 # Parenthetical notes such as (COM), (gas mode) and (SCR) are ignored only
 # while classifying. The original Excel text remains unchanged in results and
@@ -336,7 +326,6 @@ def emission_classes_in(value: Any) -> list[str]:
     --------
     "IMO Tier III / EPA 4 (COM) / Stage V"
         -> ["IMO_III", "EPA_4", "EU_STAGE_V"]
-
     "IMO Tier II / IMO Tier III (gas mode)"
         -> ["IMO_II", "IMO_III"]
 
@@ -345,11 +334,9 @@ def emission_classes_in(value: Any) -> list[str]:
     """
     if value is None or pd.isna(value):
         return []
-
     text = str(value).strip().upper()
     if not text:
         return []
-
     # Ignore notes such as (COM), (gas mode) and (SCR) for classification.
     text = _PARENTHETICAL_NOTE_RE.sub(" ", text)
 
@@ -393,7 +380,6 @@ def build_imo_options(data: pd.DataFrame) -> tuple[list[str], dict[str, set[str]
     -------
     Raw value:
         "IMO Tier III / EPA 4 (COM) / Stage V"
-
     Mappings:
         "IMO Tier III" -> raw value
         "EPA Tier 4"   -> raw value
@@ -405,19 +391,16 @@ def build_imo_options(data: pd.DataFrame) -> tuple[list[str], dict[str, set[str]
         emission_class: set()
         for emission_class in _EMISSION_CLASS_ORDER
     }
-
     for raw_value in raw_values:
         for emission_class in emission_classes_in(raw_value):
             class_to_raw[emission_class].add(raw_value)
 
     options: list[str] = []
     option_to_raw: dict[str, set[str]] = {}
-
     for emission_class in _EMISSION_CLASS_ORDER:
         matching_raw_values = class_to_raw[emission_class]
         if not matching_raw_values:
             continue
-
         label = _EMISSION_LABELS[emission_class]
         options.append(label)
         option_to_raw[label] = matching_raw_values
@@ -486,10 +469,8 @@ def render_grouped_results(data: pd.DataFrame, accent: str = "match") -> None:
             power_text = f" · {powers.min():,.1f} kW"
         else:
             power_text = f" · {powers.min():,.1f}–{powers.max():,.1f} kW"
-
         label = "rating" if count == 1 else "ratings"
-        header = f"{marker}{brand} — {model}   ·   {count} {label}{power_text}"
-
+        header = f"{marker}{brand} — {model} · {count} {label}{power_text}"
         with st.expander(header, expanded=False):
             scenarios = display_table(group)
             # The model/brand is already in the header, so drop those columns inside.
@@ -511,6 +492,8 @@ FILTER_WIDGET_KEYS = (
     "selected_voltages",
     "selected_frequencies",
     "power_range",
+    "power_min_input",
+    "power_max_input",
     "selected_imo",
     "max_width_mm",
     "max_depth_mm",
@@ -630,18 +613,69 @@ def render_filters(data: pd.DataFrame, imo_options: list[str]) -> dict[str, Any]
         minimum_power = None
         maximum_power = None
     else:
-        power_low, power_high = st.slider(
+        power_step = max(round((power_max - power_min) / 100, 1), 0.1)
+
+        # Slider ve sayı kutuları aynı değeri paylaşsın diye ortak state.
+        if "power_range" not in st.session_state:
+            st.session_state["power_range"] = (power_min, power_max)
+        if "power_min_input" not in st.session_state:
+            st.session_state["power_min_input"] = float(power_min)
+        if "power_max_input" not in st.session_state:
+            st.session_state["power_max_input"] = float(power_max)
+
+        def _clamp_power(value: float) -> float:
+            return min(max(float(value), power_min), power_max)
+
+        def _power_from_slider() -> None:
+            low, high = st.session_state["power_range"]
+            st.session_state["power_min_input"] = float(low)
+            st.session_state["power_max_input"] = float(high)
+
+        def _power_from_inputs() -> None:
+            low = _clamp_power(st.session_state["power_min_input"])
+            high = _clamp_power(st.session_state["power_max_input"])
+            if low > high:
+                low, high = high, low
+            st.session_state["power_range"] = (low, high)
+            st.session_state["power_min_input"] = low
+            st.session_state["power_max_input"] = high
+
+        st.slider(
             "Power range [kW]",
             min_value=power_min,
             max_value=power_max,
-            value=(power_min, power_max),
-            step=max(round((power_max - power_min) / 100, 1), 0.1),
+            step=power_step,
             key="power_range",
+            on_change=_power_from_slider,
             help=(
-                "Drag the handles to set a minimum and/or maximum. "
+                "Drag the handles or type exact values below. "
                 "Full range means no power filter."
             ),
         )
+
+        p_min_col, p_max_col = st.columns(2)
+        with p_min_col:
+            st.number_input(
+                "Min power [kW]",
+                min_value=power_min,
+                max_value=power_max,
+                step=power_step,
+                key="power_min_input",
+                on_change=_power_from_inputs,
+                help="Type an exact minimum — stays in sync with the slider.",
+            )
+        with p_max_col:
+            st.number_input(
+                "Max power [kW]",
+                min_value=power_min,
+                max_value=power_max,
+                step=power_step,
+                key="power_max_input",
+                on_change=_power_from_inputs,
+                help="Type an exact maximum — stays in sync with the slider.",
+            )
+
+        power_low, power_high = st.session_state["power_range"]
         minimum_power = power_low if power_low > power_min else None
         maximum_power = power_high if power_high < power_max else None
 
@@ -794,7 +828,7 @@ def render_results(
             st.error("The filtered Excel export could not be generated.")
         else:
             st.download_button(
-                "⬇  Export filtered results to Excel",
+                "⬇ Export filtered results to Excel",
                 data=export_bytes,
                 file_name="filtered_generator_catalog_results.xlsx",
                 mime=(
@@ -914,7 +948,6 @@ def main() -> None:
         "</div>",
         unsafe_allow_html=True,
     )
-
     with st.container(border=True):
         raw_filters = render_filters(data, imo_options)
 
@@ -922,7 +955,7 @@ def main() -> None:
     # strings that contain it. One raw string may belong to multiple classes.
     #
     # Example:
-    #   "IMO Tier III / EPA 4 (COM) / Stage V"
+    #     "IMO Tier III / EPA 4 (COM) / Stage V"
     # is included when the user selects IMO Tier III, EPA Tier 4 or EU Stage V.
     #
     # The downstream data filter remains an exact text match and the stored
