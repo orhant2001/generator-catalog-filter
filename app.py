@@ -521,13 +521,38 @@ def reset_results(clear_filter_widgets: bool = False) -> None:
 def reset_filters_callback() -> None:
     """Reset every filter widget from a button ``on_click`` callback.
 
-    Running the clear inside a callback (rather than inline after the widgets
-    are drawn) means it executes *before* any widget is instantiated on the
-    next run, so the widgets always rebuild from their defaults. This avoids
-    the browser occasionally restoring a stale value when a widget declares
-    both a ``default``/``value`` and a ``key``.
+    Non-power widgets are *explicitly set* to their empty value rather than
+    popped: in the browser, clearing a key alone lets a widget that declares a
+    ``default`` restore the stale selection, so an explicit assignment inside
+    the callback (which runs before any widget is instantiated) is the reliable
+    reset. The power widgets carry no ``default`` and are popped so their
+    init block re-seeds them to the full catalogue range on the next run.
     """
-    reset_results(clear_filter_widgets=True)
+    for key in (
+        "filter_result",
+        "filter_unverified",
+        "filter_values",
+        "missing_filter_columns",
+    ):
+        st.session_state.pop(key, None)
+
+    st.session_state["selected_brands"] = []
+    st.session_state["model_query"] = ""
+    st.session_state["selected_voltages"] = []
+    st.session_state["selected_frequencies"] = []
+    st.session_state["selected_imo"] = []
+    for key in (
+        "max_width_mm",
+        "max_depth_mm",
+        "max_height_mm",
+        "max_dry_weight_kg",
+        "max_wet_weight_kg",
+        "max_fuel_consumption_g_bkwh",
+    ):
+        st.session_state[key] = None
+
+    for key in ("power_range", "power_min_input", "power_max_input"):
+        st.session_state.pop(key, None)
 
 
 def numeric_column_max(data: pd.DataFrame, column: str, fallback: float = 0.0) -> float:
@@ -581,7 +606,6 @@ def render_filters(data: pd.DataFrame, imo_options: list[str]) -> dict[str, Any]
         selected_brands = st.multiselect(
             "Brands",
             options=brands,
-            default=[],
             key="selected_brands",
             placeholder="All brands — leave empty for every manufacturer",
             help="Pick one or more manufacturers, or leave empty to include all brands.",
@@ -600,7 +624,6 @@ def render_filters(data: pd.DataFrame, imo_options: list[str]) -> dict[str, Any]
         selected_voltages = st.multiselect(
             "Line-line voltage [V]",
             options=voltages,
-            default=[],
             key="selected_voltages",
             format_func=format_option,
             placeholder="All voltages",
@@ -610,7 +633,6 @@ def render_filters(data: pd.DataFrame, imo_options: list[str]) -> dict[str, Any]
         selected_frequencies = st.multiselect(
             "Frequency [Hz]",
             options=frequencies,
-            default=[],
             key="selected_frequencies",
             format_func=format_option,
             placeholder="All frequencies",
@@ -741,7 +763,6 @@ def render_filters(data: pd.DataFrame, imo_options: list[str]) -> dict[str, Any]
         selected_imo = st.multiselect(
             "Emission standard",
             options=imo_options,
-            default=[],
             key="selected_imo",
             placeholder="All recognized emission standards",
             help=(
