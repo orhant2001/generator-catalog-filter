@@ -518,6 +518,18 @@ def reset_results(clear_filter_widgets: bool = False) -> None:
             st.session_state.pop(key, None)
 
 
+def reset_filters_callback() -> None:
+    """Reset every filter widget from a button ``on_click`` callback.
+
+    Running the clear inside a callback (rather than inline after the widgets
+    are drawn) means it executes *before* any widget is instantiated on the
+    next run, so the widgets always rebuild from their defaults. This avoids
+    the browser occasionally restoring a stale value when a widget declares
+    both a ``default``/``value`` and a ``key``.
+    """
+    reset_results(clear_filter_widgets=True)
+
+
 def numeric_column_max(data: pd.DataFrame, column: str, fallback: float = 0.0) -> float:
     """Return a safe non-negative default maximum for an optional column."""
     if column not in data.columns:
@@ -978,9 +990,11 @@ def main() -> None:
         type="primary",
         use_container_width=True,
     )
-    if reset_col.button("Reset filters", use_container_width=True):
-        reset_results(clear_filter_widgets=True)
-        st.rerun()
+    reset_col.button(
+        "Reset filters",
+        use_container_width=True,
+        on_click=reset_filters_callback,
+    )
 
     if find_clicked:
         try:
